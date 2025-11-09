@@ -1,0 +1,8 @@
+[logo]
+file_path = "C:/Users/kgt92/OneDrive/ドキュメント/シグネチャ/signature-2.png"
+position ="BOTTOM-RIGHT"
+
+[output]
+resolution = "HD"
+output_path = "./tmp/output"
+
