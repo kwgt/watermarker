@@ -21,7 +21,9 @@ use fast_image_resize::{
 };
 use fast_image_resize::images::Image;
 use image::{ImageBuffer, RgbaImage};
-use image::imageops::overlay;
+use image::imageops::{
+    flip_horizontal, flip_vertical, rotate180, rotate270, rotate90, overlay
+};
 use mozjpeg::{ColorSpace, Compress, Decompress};
 use walkdir::{DirEntry, WalkDir};
 
@@ -212,11 +214,7 @@ fn decode_jpeg<P>(path: P) -> Result<RgbaImage>
 where 
     P: AsRef<Path>
 {
-    //let mut file = File::open(path)?;
-    //let mut jpeg = Vec::new();
-    //
-    //file.read_to_end(&mut jpeg)?;
-    let reader= BufReader::new(File::open(path)?);
+    let reader= BufReader::new(File::open(&path)?);
 
     let mut decomp = Decompress::new_reader(reader)?.rgba()?;
 
@@ -227,7 +225,42 @@ where
     let image: RgbaImage = ImageBuffer::from_raw(width, height, pixels)
         .ok_or_else(|| anyhow!("invalid dimensions"))?;
 
-    Ok(image)
+    Ok(match read_exif_orientation(&path)? {
+        1 => image,
+        2 => flip_horizontal(&image),
+        3 => rotate180(&image),
+        4 => flip_vertical(&image),
+        5 => flip_horizontal(&rotate90(&image)),
+        6 => rotate90(&image),
+        7 => flip_vertical(&rotate90(&image)),
+        8 => rotate270(&image),
+        _ => image,
+    })
+}
+
+///
+/// EXIF Orientationの読み出し
+///
+/// # 引数
+/// * `path` - 対象ファイルのパス
+///
+/// # 戻り値
+/// Exif Orientationの値
+///
+/// # 参考
+/// https://qiita.com/yoya/items/4e14f696e1afd5a54403
+///
+fn read_exif_orientation<P>(path: P) -> Result<u32>
+where 
+    P: AsRef<Path>
+{
+    let mut buf = BufReader::new(File::open(path)?);
+    let exif = exif::Reader::new().read_from_container(&mut buf)?;
+
+    Ok(exif
+        .get_field(exif::Tag::Orientation, exif::In::PRIMARY)
+        .and_then(|field| field.value.get_uint(0))
+        .unwrap_or(1))
 }
 
 ///
